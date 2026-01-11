@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react'
+import { createContext, useContext, useState, ReactNode } from 'react'
 import { BoardType, ColumnId, Deal, BOARD_COLUMNS } from '@/types/crm'
 
 interface CRMContextType {
@@ -88,7 +88,7 @@ const MOCK_DEALS: Deal[] = [
     board: 'operation',
     createdAt: new Date(),
     updatedAt: new Date(),
-  }
+  },
 ]
 
 export function CRMProvider({ children }: { children: ReactNode }) {
@@ -102,34 +102,38 @@ export function CRMProvider({ children }: { children: ReactNode }) {
 
   const updateDeal = (id: string, updates: Partial<Deal>) => {
     setDeals((prev) =>
-      prev.map((deal) => (deal.id === id ? { ...deal, ...updates, updatedAt: new Date() } : deal))
+      prev.map((deal) =>
+        deal.id === id ? { ...deal, ...updates, updatedAt: new Date() } : deal,
+      ),
     )
   }
 
   const moveDeal = (dealId: string, newStatus: ColumnId) => {
     setDeals((prev) =>
-      prev.map((deal) => (deal.id === dealId ? { ...deal, status: newStatus, updatedAt: new Date() } : deal))
+      prev.map((deal) =>
+        deal.id === dealId
+          ? { ...deal, status: newStatus, updatedAt: new Date() }
+          : deal,
+      ),
     )
   }
 
   return (
-    <React.createElement(
-      CRMContext.Provider,
-      {
-        value: {
-          currentBoard,
-          setCurrentBoard,
-          deals,
-          addDeal,
-          updateDeal,
-          moveDeal,
-          columns: BOARD_COLUMNS,
-          isAiPanelOpen,
-          setAiPanelOpen,
-        },
-      },
-      children
-    )
+    <CRMContext.Provider
+      value={{
+        currentBoard,
+        setCurrentBoard,
+        deals,
+        addDeal,
+        updateDeal,
+        moveDeal,
+        columns: BOARD_COLUMNS,
+        isAiPanelOpen,
+        setAiPanelOpen,
+      }}
+    >
+      {children}
+    </CRMContext.Provider>
   )
 }
 
