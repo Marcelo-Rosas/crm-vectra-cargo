@@ -615,6 +615,9 @@ section[aria-label='Notifications alt+T'] {
 .left-2\.5{
   left: 0.625rem;
 }
+.left-3{
+  left: 0.75rem;
+}
 .left-\[50\%\]{
   left: 50%;
 }
@@ -726,6 +729,9 @@ section[aria-label='Notifications alt+T'] {
 }
 .mb-1{
   margin-bottom: 0.25rem;
+}
+.mb-3{
+  margin-bottom: 0.75rem;
 }
 .mb-4{
   margin-bottom: 1rem;
@@ -928,6 +934,9 @@ section[aria-label='Notifications alt+T'] {
 .w-5{
   width: 1.25rem;
 }
+.w-6{
+  width: 1.5rem;
+}
 .w-64{
   width: 16rem;
 }
@@ -1105,6 +1114,14 @@ section[aria-label='Notifications alt+T'] {
 }
 .animate-pulse{
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+@keyframes spin{
+  to{
+    transform: rotate(360deg);
+  }
+}
+.animate-spin{
+  animation: spin 1s linear infinite;
 }
 .cursor-default{
   cursor: default;
@@ -1561,6 +1578,9 @@ section[aria-label='Notifications alt+T'] {
 .pl-8{
   padding-left: 2rem;
 }
+.pl-9{
+  padding-left: 2.25rem;
+}
 .pr-1{
   padding-right: 0.25rem;
 }
@@ -1712,6 +1732,10 @@ section[aria-label='Notifications alt+T'] {
 }
 .text-primary-foreground{
   color: hsl(var(--primary-foreground));
+}
+.text-red-500{
+  --tw-text-opacity: 1;
+  color: rgb(239 68 68 / var(--tw-text-opacity, 1));
 }
 .text-secondary-foreground{
   color: hsl(var(--secondary-foreground));
@@ -2893,6 +2917,9 @@ section[aria-label='Notifications alt+T'] {
   .md\:absolute{
     position: absolute;
   }
+  .md\:col-span-2{
+    grid-column: span 2 / span 2;
+  }
   .md\:block{
     display: block;
   }
@@ -2910,6 +2937,9 @@ section[aria-label='Notifications alt+T'] {
   }
   .md\:max-w-\[420px\]{
     max-width: 420px;
+  }
+  .md\:grid-cols-2{
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .md\:flex-row{
     flex-direction: row;

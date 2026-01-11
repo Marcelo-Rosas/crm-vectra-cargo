@@ -34,6 +34,7 @@ export interface Deal {
   value: number
   status: ColumnId
   board: BoardType
+  stageId?: string // UUID from database
   createdAt: Date
   updatedAt: Date
 
@@ -41,6 +42,7 @@ export interface Deal {
   deadline?: Date
   restrictions?: string
   merchandiseValue?: number
+  urgent?: boolean
 
   // Pricing Details
   baseFreight?: number
@@ -57,6 +59,32 @@ export interface Deal {
   // Alerts
   isLate?: boolean
   missingDocs?: boolean
+
+  // Dynamic Fields Data
+  [key: string]: any
+}
+
+export type FieldType =
+  | 'text'
+  | 'number'
+  | 'currency'
+  | 'date'
+  | 'checkbox'
+  | 'textarea'
+  | 'select'
+
+export interface SchemaField {
+  key: string
+  label: string
+  type: FieldType
+  required: boolean
+  placeholder?: string
+  options?: string[] // For select
+  defaultValue?: any
+}
+
+export interface StageFormSchema {
+  fields: SchemaField[]
 }
 
 export const BOARD_COLUMNS: Record<BoardType, Column[]> = {

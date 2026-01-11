@@ -40,8 +40,9 @@ const MOCK_DEALS: Deal[] = [
     weight: 5000,
     volume: 12,
     value: 12000,
-    status: 'pricing',
+    status: 'qualification',
     board: 'quotation',
+    stageId: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', // UUID linking to Supabase Seed
     createdAt: new Date(),
     updatedAt: new Date(),
   },
