@@ -238,7 +238,7 @@ export default function StageFieldsConfig() {
                       </SelectItem>
                     ))
                   ) : (
-                    <div className="py-3 text-center text-sm text-muted-foreground">
+                    <div className="py-3 text-center text-sm text-muted-foreground px-2">
                       {isLoadingBoards
                         ? 'Carregando...'
                         : 'Nenhum quadro encontrado'}
@@ -279,13 +279,13 @@ export default function StageFieldsConfig() {
                       </SelectItem>
                     ))
                   ) : selectedBoardId ? (
-                    <div className="py-3 text-center text-sm text-muted-foreground">
+                    <div className="py-3 text-center text-sm text-muted-foreground px-2">
                       {isLoadingStages
                         ? 'Carregando...'
                         : 'Nenhuma etapa encontrada'}
                     </div>
                   ) : (
-                    <div className="py-3 text-center text-sm text-muted-foreground">
+                    <div className="py-3 text-center text-sm text-muted-foreground px-2">
                       Selecione um quadro
                     </div>
                   )}

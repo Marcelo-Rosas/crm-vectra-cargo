@@ -39837,11 +39837,16 @@ var NotFound = () => {
 };
 var NotFound_default = NotFound;
 const boardsService = { getBoards: async () => {
-	const { data, error } = await supabase.from("boards").select("id, name").is("deleted_at", null).order("name");
+	const { data: { user } } = await supabase.auth.getUser();
+	if (!user) throw new Error("Usuário não autenticado");
+	const { data: profile } = await supabase.from("profiles").select("organization_id").eq("id", user.id).single();
+	if (!profile?.organization_id) return [];
+	const { data, error } = await supabase.from("boards").select("id, name").eq("organization_id", profile.organization_id).is("deleted_at", null).order("name");
 	if (error) throw error;
 	return data || [];
 } };
 const stagesService = { getStagesByBoardId: async (boardId) => {
+	if (!boardId) return [];
 	const { data, error } = await supabase.from("board_stages").select("id, name").eq("board_id", boardId).order("order", { ascending: true });
 	if (error) throw error;
 	return data || [];
@@ -40234,7 +40239,7 @@ function StageFieldsConfig() {
 										value: board.id,
 										children: board.name
 									}, board.id)) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-										className: "py-3 text-center text-sm text-muted-foreground",
+										className: "py-3 text-center text-sm text-muted-foreground px-2",
 										children: isLoadingBoards ? "Carregando..." : "Nenhum quadro encontrado"
 									}) })]
 								})]
@@ -40253,10 +40258,10 @@ function StageFieldsConfig() {
 										value: stage.id,
 										children: stage.name
 									}, stage.id)) : selectedBoardId ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-										className: "py-3 text-center text-sm text-muted-foreground",
+										className: "py-3 text-center text-sm text-muted-foreground px-2",
 										children: isLoadingStages ? "Carregando..." : "Nenhuma etapa encontrada"
 									}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-										className: "py-3 text-center text-sm text-muted-foreground",
+										className: "py-3 text-center text-sm text-muted-foreground px-2",
 										children: "Selecione um quadro"
 									}) })]
 								})]
@@ -41329,4 +41334,4 @@ var App = () => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(QueryProvider, { chi
 var App_default = App;
 (0, import_client.createRoot)(document.getElementById("root")).render(/* @__PURE__ */ (0, import_jsx_runtime.jsx)(App_default, {}));
 
-//# sourceMappingURL=index-Dpi45Rdz.js.map
+//# sourceMappingURL=index-B8K6U4ch.js.map

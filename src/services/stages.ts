@@ -2,6 +2,8 @@ import { supabase } from '@/lib/supabase/client'
 
 export const stagesService = {
   getStagesByBoardId: async (boardId: string) => {
+    if (!boardId) return []
+
     const { data, error } = await supabase
       .from('board_stages')
       .select('id, name')
