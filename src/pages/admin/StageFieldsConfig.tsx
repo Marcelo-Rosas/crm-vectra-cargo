@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import {
@@ -26,6 +26,8 @@ import {
   ArrowLeft,
   Loader2,
   AlertCircle,
+  LayoutDashboard,
+  ListOrdered,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { boardsService } from '@/services/boards'
@@ -35,6 +37,7 @@ import { StageFormSchema, SchemaField } from '@/types/crm'
 import { FieldEditorDialog } from '@/components/admin/FieldEditorDialog'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Separator } from '@/components/ui/separator'
 
 export default function StageFieldsConfig() {
   const [selectedBoardId, setSelectedBoardId] = useState<string>('')
@@ -53,6 +56,7 @@ export default function StageFieldsConfig() {
   } = useQuery({
     queryKey: ['boards'],
     queryFn: boardsService.getBoards,
+    staleTime: 5 * 60 * 1000, // 5 minutes
   })
 
   const {
@@ -92,7 +96,7 @@ export default function StageFieldsConfig() {
     },
   })
 
-  // Effects
+  // Effects to sync local state with fetched data
   useEffect(() => {
     if (fetchedSchema) {
       setSchema(fetchedSchema)
@@ -101,10 +105,16 @@ export default function StageFieldsConfig() {
     }
   }, [fetchedSchema, selectedStageId])
 
+  // Computed Dirty State
+  const isDirty = useMemo(() => {
+    const reference = fetchedSchema || { fields: [] }
+    return JSON.stringify(schema) !== JSON.stringify(reference)
+  }, [schema, fetchedSchema])
+
   const handleBoardChange = (boardId: string) => {
     setSelectedBoardId(boardId)
-    setSelectedStageId('')
-    setSchema({ fields: [] })
+    setSelectedStageId('') // Reset stage when board changes
+    setSchema({ fields: [] }) // Reset schema
   }
 
   const handleAddField = () => {
@@ -173,7 +183,9 @@ export default function StageFieldsConfig() {
         <div className="flex items-center gap-2">
           <Button
             onClick={handleSaveSchema}
-            disabled={!selectedStageId || saveSchemaMutation.isPending}
+            disabled={
+              !selectedStageId || saveSchemaMutation.isPending || !isDirty
+            }
           >
             {saveSchemaMutation.isPending ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -187,12 +199,12 @@ export default function StageFieldsConfig() {
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 h-[calc(100vh-200px)]">
         {/* Sidebar Selection */}
-        <Card className="md:col-span-1 h-full">
+        <Card className="md:col-span-1 h-full flex flex-col">
           <CardHeader>
             <CardTitle className="text-lg">Seleção</CardTitle>
             <CardDescription>Escolha o quadro e a etapa</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-6">
             {isErrorBoards && (
               <Alert variant="destructive" className="mb-4">
                 <AlertCircle className="h-4 w-4" />
@@ -201,8 +213,11 @@ export default function StageFieldsConfig() {
               </Alert>
             )}
 
-            <div className="space-y-2">
-              <Label>Quadro (Board)</Label>
+            <div className="space-y-3">
+              <Label className="flex items-center gap-2">
+                <LayoutDashboard className="h-4 w-4 text-muted-foreground" />
+                Quadro (Board)
+              </Label>
               <Select
                 value={selectedBoardId}
                 onValueChange={handleBoardChange}
@@ -216,17 +231,30 @@ export default function StageFieldsConfig() {
                   />
                 </SelectTrigger>
                 <SelectContent>
-                  {boards?.map((board) => (
-                    <SelectItem key={board.id} value={board.id}>
-                      {board.name}
-                    </SelectItem>
-                  ))}
+                  {boards && boards.length > 0 ? (
+                    boards.map((board) => (
+                      <SelectItem key={board.id} value={board.id}>
+                        {board.name}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <div className="py-3 text-center text-sm text-muted-foreground">
+                      {isLoadingBoards
+                        ? 'Carregando...'
+                        : 'Nenhum quadro encontrado'}
+                    </div>
+                  )}
                 </SelectContent>
               </Select>
             </div>
 
-            <div className="space-y-2">
-              <Label>Etapa (Stage)</Label>
+            <Separator />
+
+            <div className="space-y-3">
+              <Label className="flex items-center gap-2">
+                <ListOrdered className="h-4 w-4 text-muted-foreground" />
+                Etapa (Stage)
+              </Label>
               <Select
                 value={selectedStageId}
                 onValueChange={setSelectedStageId}
@@ -244,11 +272,23 @@ export default function StageFieldsConfig() {
                   />
                 </SelectTrigger>
                 <SelectContent>
-                  {stages?.map((stage) => (
-                    <SelectItem key={stage.id} value={stage.id}>
-                      {stage.name}
-                    </SelectItem>
-                  ))}
+                  {stages && stages.length > 0 ? (
+                    stages.map((stage) => (
+                      <SelectItem key={stage.id} value={stage.id}>
+                        {stage.name}
+                      </SelectItem>
+                    ))
+                  ) : selectedBoardId ? (
+                    <div className="py-3 text-center text-sm text-muted-foreground">
+                      {isLoadingStages
+                        ? 'Carregando...'
+                        : 'Nenhuma etapa encontrada'}
+                    </div>
+                  ) : (
+                    <div className="py-3 text-center text-sm text-muted-foreground">
+                      Selecione um quadro
+                    </div>
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -268,7 +308,7 @@ export default function StageFieldsConfig() {
               <CardTitle className="text-lg">Campos da Etapa</CardTitle>
               <CardDescription>
                 {selectedStageId
-                  ? `Editando ${stages?.find((s) => s.id === selectedStageId)?.name}`
+                  ? `Editando: ${stages?.find((s) => s.id === selectedStageId)?.name || 'Etapa'}`
                   : 'Selecione uma etapa para começar'}
               </CardDescription>
             </div>
@@ -303,8 +343,8 @@ export default function StageFieldsConfig() {
               <ScrollArea className="h-full">
                 <div className="p-6 space-y-3">
                   {schema.fields.length === 0 ? (
-                    <div className="text-center py-10 border-2 border-dashed rounded-lg">
-                      <p className="text-muted-foreground">
+                    <div className="text-center py-10 border-2 border-dashed rounded-lg bg-muted/10">
+                      <p className="text-muted-foreground mb-2">
                         Nenhum campo configurado para esta etapa.
                       </p>
                       <Button variant="link" onClick={handleAddField}>

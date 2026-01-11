@@ -19138,6 +19138,32 @@ var LayoutDashboard = createLucideIcon("layout-dashboard", [
 		key: "ldoo1y"
 	}]
 ]);
+var ListOrdered = createLucideIcon("list-ordered", [
+	["path", {
+		d: "M11 5h10",
+		key: "1cz7ny"
+	}],
+	["path", {
+		d: "M11 12h10",
+		key: "1438ji"
+	}],
+	["path", {
+		d: "M11 19h10",
+		key: "11t30w"
+	}],
+	["path", {
+		d: "M4 4h1v5",
+		key: "10yrso"
+	}],
+	["path", {
+		d: "M4 9h2",
+		key: "r1h2o0"
+	}],
+	["path", {
+		d: "M6.5 20H3.4c0-1 2.6-1.925 2.6-3.5a1.5 1.5 0 0 0-2.6-1.02",
+		key: "xtkcd5"
+	}]
+]);
 var LoaderCircle = createLucideIcon("loader-circle", [["path", {
 	d: "M21 12a9 9 0 1 1-6.219-8.56",
 	key: "13zald"
@@ -40062,7 +40088,8 @@ function StageFieldsConfig() {
 	const queryClient$1 = useQueryClient();
 	const { data: boards, isLoading: isLoadingBoards, isError: isErrorBoards } = useQuery({
 		queryKey: ["boards"],
-		queryFn: boardsService.getBoards
+		queryFn: boardsService.getBoards,
+		staleTime: 300 * 1e3
 	});
 	const { data: stages, isLoading: isLoadingStages, isError: isErrorStages } = useQuery({
 		queryKey: ["stages", selectedBoardId],
@@ -40091,6 +40118,10 @@ function StageFieldsConfig() {
 		if (fetchedSchema) setSchema(fetchedSchema);
 		else setSchema({ fields: [] });
 	}, [fetchedSchema, selectedStageId]);
+	const isDirty = (0, import_react.useMemo)(() => {
+		const reference = fetchedSchema || { fields: [] };
+		return JSON.stringify(schema) !== JSON.stringify(reference);
+	}, [schema, fetchedSchema]);
 	const handleBoardChange = (boardId) => {
 		setSelectedBoardId(boardId);
 		setSelectedStageId("");
@@ -40166,7 +40197,7 @@ function StageFieldsConfig() {
 					className: "flex items-center gap-2",
 					children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Button, {
 						onClick: handleSaveSchema,
-						disabled: !selectedStageId || saveSchemaMutation.isPending,
+						disabled: !selectedStageId || saveSchemaMutation.isPending || !isDirty,
 						children: [saveSchemaMutation.isPending ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LoaderCircle, { className: "mr-2 h-4 w-4 animate-spin" }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Save, { className: "mr-2 h-4 w-4" }), "Salvar Alterações"]
 					})
 				})]
@@ -40174,12 +40205,12 @@ function StageFieldsConfig() {
 			/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 				className: "grid grid-cols-1 md:grid-cols-4 gap-6 h-[calc(100vh-200px)]",
 				children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Card, {
-					className: "md:col-span-1 h-full",
+					className: "md:col-span-1 h-full flex flex-col",
 					children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(CardHeader, { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(CardTitle, {
 						className: "text-lg",
 						children: "Seleção"
 					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CardDescription, { children: "Escolha o quadro e a etapa" })] }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(CardContent, {
-						className: "space-y-4",
+						className: "space-y-6",
 						children: [
 							isErrorBoards && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Alert, {
 								variant: "destructive",
@@ -40191,27 +40222,43 @@ function StageFieldsConfig() {
 								]
 							}),
 							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-								className: "space-y-2",
-								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label, { children: "Quadro (Board)" }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Select, {
+								className: "space-y-3",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Label, {
+									className: "flex items-center gap-2",
+									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(LayoutDashboard, { className: "h-4 w-4 text-muted-foreground" }), "Quadro (Board)"]
+								}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Select, {
 									value: selectedBoardId,
 									onValueChange: handleBoardChange,
 									disabled: isLoadingBoards,
-									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(SelectTrigger, { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SelectValue, { placeholder: isLoadingBoards ? "Carregando..." : "Selecione um quadro" }) }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SelectContent, { children: boards?.map((board) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SelectItem, {
+									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(SelectTrigger, { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SelectValue, { placeholder: isLoadingBoards ? "Carregando..." : "Selecione um quadro" }) }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SelectContent, { children: boards && boards.length > 0 ? boards.map((board) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SelectItem, {
 										value: board.id,
 										children: board.name
-									}, board.id)) })]
+									}, board.id)) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+										className: "py-3 text-center text-sm text-muted-foreground",
+										children: isLoadingBoards ? "Carregando..." : "Nenhum quadro encontrado"
+									}) })]
 								})]
 							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Separator, {}),
 							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-								className: "space-y-2",
-								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label, { children: "Etapa (Stage)" }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Select, {
+								className: "space-y-3",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Label, {
+									className: "flex items-center gap-2",
+									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(ListOrdered, { className: "h-4 w-4 text-muted-foreground" }), "Etapa (Stage)"]
+								}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Select, {
 									value: selectedStageId,
 									onValueChange: setSelectedStageId,
 									disabled: !selectedBoardId || isLoadingStages,
-									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(SelectTrigger, { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SelectValue, { placeholder: !selectedBoardId ? "Selecione um quadro primeiro" : isLoadingStages ? "Carregando etapas..." : "Selecione uma etapa" }) }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SelectContent, { children: stages?.map((stage) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SelectItem, {
+									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(SelectTrigger, { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SelectValue, { placeholder: !selectedBoardId ? "Selecione um quadro primeiro" : isLoadingStages ? "Carregando etapas..." : "Selecione uma etapa" }) }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SelectContent, { children: stages && stages.length > 0 ? stages.map((stage) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SelectItem, {
 										value: stage.id,
 										children: stage.name
-									}, stage.id)) })]
+									}, stage.id)) : selectedBoardId ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+										className: "py-3 text-center text-sm text-muted-foreground",
+										children: isLoadingStages ? "Carregando..." : "Nenhuma etapa encontrada"
+									}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+										className: "py-3 text-center text-sm text-muted-foreground",
+										children: "Selecione um quadro"
+									}) })]
 								})]
 							}),
 							isErrorStages && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
@@ -40227,7 +40274,7 @@ function StageFieldsConfig() {
 						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(CardTitle, {
 							className: "text-lg",
 							children: "Campos da Etapa"
-						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CardDescription, { children: selectedStageId ? `Editando ${stages?.find((s) => s.id === selectedStageId)?.name}` : "Selecione uma etapa para começar" })] }), selectedStageId && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Button, {
+						}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CardDescription, { children: selectedStageId ? `Editando: ${stages?.find((s) => s.id === selectedStageId)?.name || "Etapa"}` : "Selecione uma etapa para começar" })] }), selectedStageId && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Button, {
 							size: "sm",
 							onClick: handleAddField,
 							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Plus, { className: "mr-2 h-4 w-4" }), "Adicionar Campo"]
@@ -40251,9 +40298,9 @@ function StageFieldsConfig() {
 							children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
 								className: "p-6 space-y-3",
 								children: schema.fields.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-									className: "text-center py-10 border-2 border-dashed rounded-lg",
+									className: "text-center py-10 border-2 border-dashed rounded-lg bg-muted/10",
 									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
-										className: "text-muted-foreground",
+										className: "text-muted-foreground mb-2",
 										children: "Nenhum campo configurado para esta etapa."
 									}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Button, {
 										variant: "link",
@@ -41282,4 +41329,4 @@ var App = () => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(QueryProvider, { chi
 var App_default = App;
 (0, import_client.createRoot)(document.getElementById("root")).render(/* @__PURE__ */ (0, import_jsx_runtime.jsx)(App_default, {}));
 
-//# sourceMappingURL=index-DLoeLO7K.js.map
+//# sourceMappingURL=index-Dpi45Rdz.js.map
