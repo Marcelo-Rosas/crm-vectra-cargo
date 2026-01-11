@@ -19029,6 +19029,28 @@ var ChevronUp = createLucideIcon("chevron-up", [["path", {
 	d: "m18 15-6-6-6 6",
 	key: "153udz"
 }]]);
+var CircleAlert = createLucideIcon("circle-alert", [
+	["circle", {
+		cx: "12",
+		cy: "12",
+		r: "10",
+		key: "1mglay"
+	}],
+	["line", {
+		x1: "12",
+		x2: "12",
+		y1: "8",
+		y2: "12",
+		key: "1pkeuh"
+	}],
+	["line", {
+		x1: "12",
+		x2: "12.01",
+		y1: "16",
+		y2: "16",
+		key: "4dfq90"
+	}]
+]);
 var Database = createLucideIcon("database", [
 	["ellipse", {
 		cx: "12",
@@ -26054,6 +26076,87 @@ function shouldAssignObserverCurrentProperties(observer, optimisticResult) {
 	if (!shallowEqualObjects(observer.getCurrentResult(), optimisticResult)) return true;
 	return false;
 }
+var MutationObserver$1 = class extends Subscribable {
+	#client;
+	#currentResult = void 0;
+	#currentMutation;
+	#mutateOptions;
+	constructor(client, options$1) {
+		super();
+		this.#client = client;
+		this.setOptions(options$1);
+		this.bindMethods();
+		this.#updateResult();
+	}
+	bindMethods() {
+		this.mutate = this.mutate.bind(this);
+		this.reset = this.reset.bind(this);
+	}
+	setOptions(options$1) {
+		const prevOptions = this.options;
+		this.options = this.#client.defaultMutationOptions(options$1);
+		if (!shallowEqualObjects(this.options, prevOptions)) this.#client.getMutationCache().notify({
+			type: "observerOptionsUpdated",
+			mutation: this.#currentMutation,
+			observer: this
+		});
+		if (prevOptions?.mutationKey && this.options.mutationKey && hashKey(prevOptions.mutationKey) !== hashKey(this.options.mutationKey)) this.reset();
+		else if (this.#currentMutation?.state.status === "pending") this.#currentMutation.setOptions(this.options);
+	}
+	onUnsubscribe() {
+		if (!this.hasListeners()) this.#currentMutation?.removeObserver(this);
+	}
+	onMutationUpdate(action) {
+		this.#updateResult();
+		this.#notify(action);
+	}
+	getCurrentResult() {
+		return this.#currentResult;
+	}
+	reset() {
+		this.#currentMutation?.removeObserver(this);
+		this.#currentMutation = void 0;
+		this.#updateResult();
+		this.#notify();
+	}
+	mutate(variables, options$1) {
+		this.#mutateOptions = options$1;
+		this.#currentMutation?.removeObserver(this);
+		this.#currentMutation = this.#client.getMutationCache().build(this.#client, this.options);
+		this.#currentMutation.addObserver(this);
+		return this.#currentMutation.execute(variables);
+	}
+	#updateResult() {
+		const state = this.#currentMutation?.state ?? getDefaultState();
+		this.#currentResult = {
+			...state,
+			isPending: state.status === "pending",
+			isSuccess: state.status === "success",
+			isError: state.status === "error",
+			isIdle: state.status === "idle",
+			mutate: this.mutate,
+			reset: this.reset
+		};
+	}
+	#notify(action) {
+		notifyManager.batch(() => {
+			if (this.#mutateOptions && this.hasListeners()) {
+				const variables = this.#currentResult.variables;
+				const context = this.#currentResult.context;
+				if (action?.type === "success") {
+					this.#mutateOptions.onSuccess?.(action.data, variables, context);
+					this.#mutateOptions.onSettled?.(action.data, null, variables, context);
+				} else if (action?.type === "error") {
+					this.#mutateOptions.onError?.(action.error, variables, context);
+					this.#mutateOptions.onSettled?.(void 0, action.error, variables, context);
+				}
+			}
+			this.listeners.forEach((listener) => {
+				listener(this.#currentResult);
+			});
+		});
+	}
+};
 var QueryClientContext = import_react.createContext(void 0);
 var useQueryClient = (queryClient$1) => {
 	const client = import_react.useContext(QueryClientContext);
@@ -26158,6 +26261,23 @@ function useBaseQuery(options$1, Observer$1, queryClient$1) {
 }
 function useQuery(options$1, queryClient$1) {
 	return useBaseQuery(options$1, QueryObserver, queryClient$1);
+}
+function useMutation(options$1, queryClient$1) {
+	const client = useQueryClient(queryClient$1);
+	const [observer] = import_react.useState(() => new MutationObserver$1(client, options$1));
+	import_react.useEffect(() => {
+		observer.setOptions(options$1);
+	}, [observer, options$1]);
+	const result = import_react.useSyncExternalStore(import_react.useCallback((onStoreChange) => observer.subscribe(notifyManager.batchCalls(onStoreChange)), [observer]), () => observer.getCurrentResult(), () => observer.getCurrentResult());
+	const mutate = import_react.useCallback((variables, mutateOptions) => {
+		observer.mutate(variables, mutateOptions).catch(noop$2);
+	}, [observer]);
+	if (result.error && shouldThrowError(observer.options.throwOnError, [result.error])) throw result.error;
+	return {
+		...result,
+		mutate,
+		mutateAsync: result.mutate
+	};
 }
 var queryClient = new QueryClient({ defaultOptions: { queries: {
 	retry: false,
@@ -39691,7 +39811,7 @@ var NotFound = () => {
 };
 var NotFound_default = NotFound;
 const boardsService = { getBoards: async () => {
-	const { data, error } = await supabase.from("boards").select("id, name").order("name");
+	const { data, error } = await supabase.from("boards").select("id, name").is("deleted_at", null).order("name");
 	if (error) throw error;
 	return data || [];
 } };
@@ -39760,12 +39880,21 @@ function FieldEditorDialog({ open, onOpenChange, field, onSave }) {
 			setOptionsString("");
 		}
 	}, [field, open]);
+	const formatKey = (value) => {
+		return value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "_");
+	};
 	const handleLabelChange = (value) => {
 		const updates = { label: value };
-		if (!field && !formData.key) updates.key = value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "_");
+		if (!field && !formData.key) updates.key = formatKey(value);
 		setFormData((prev) => ({
 			...prev,
 			...updates
+		}));
+	};
+	const handleKeyChange = (value) => {
+		setFormData((prev) => ({
+			...prev,
+			key: formatKey(value)
 		}));
 	};
 	const handleSave = () => {
@@ -39806,17 +39935,14 @@ function FieldEditorDialog({ open, onOpenChange, field, onSave }) {
 								/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Input, {
 									id: "key",
 									value: formData.key,
-									onChange: (e) => setFormData({
-										...formData,
-										key: e.target.value
-									}),
+									onChange: (e) => handleKeyChange(e.target.value),
 									placeholder: "contract_number",
 									className: "font-mono text-sm",
 									disabled: !!field
 								}),
 								/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
 									className: "text-[10px] text-muted-foreground",
-									children: "Identificador único usado no banco de dados."
+									children: "Identificador único usado no banco de dados. Apenas letras minúsculas, números e sublinhados."
 								})
 							]
 						}),
@@ -39901,31 +40027,75 @@ function FieldEditorDialog({ open, onOpenChange, field, onSave }) {
 		})
 	});
 }
+var alertVariants = cva("relative w-full rounded-lg border p-4 [&>svg~*]:pl-7 [&>svg+div]:translate-y-[-3px] [&>svg]:absolute [&>svg]:left-4 [&>svg]:top-4 [&>svg]:text-foreground", {
+	variants: { variant: {
+		default: "bg-background text-foreground",
+		destructive: "border-destructive/50 text-destructive dark:border-destructive [&>svg]:text-destructive"
+	} },
+	defaultVariants: { variant: "default" }
+});
+var Alert = import_react.forwardRef(({ className, variant, ...props }, ref) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+	ref,
+	role: "alert",
+	className: cn(alertVariants({ variant }), className),
+	...props
+}));
+Alert.displayName = "Alert";
+var AlertTitle = import_react.forwardRef(({ className, ...props }, ref) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("h5", {
+	ref,
+	className: cn("mb-1 font-medium leading-none tracking-tight", className),
+	...props
+}));
+AlertTitle.displayName = "AlertTitle";
+var AlertDescription = import_react.forwardRef(({ className, ...props }, ref) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
+	ref,
+	className: cn("text-sm [&_p]:leading-relaxed", className),
+	...props
+}));
+AlertDescription.displayName = "AlertDescription";
 function StageFieldsConfig() {
 	const [selectedBoardId, setSelectedBoardId] = (0, import_react.useState)("");
 	const [selectedStageId, setSelectedStageId] = (0, import_react.useState)("");
 	const [schema, setSchema] = (0, import_react.useState)({ fields: [] });
 	const [isEditorOpen, setIsEditorOpen] = (0, import_react.useState)(false);
 	const [editingField, setEditingField] = (0, import_react.useState)(null);
-	const [isSaving, setIsSaving] = (0, import_react.useState)(false);
-	const { data: boards } = useQuery({
+	const queryClient$1 = useQueryClient();
+	const { data: boards, isLoading: isLoadingBoards, isError: isErrorBoards } = useQuery({
 		queryKey: ["boards"],
 		queryFn: boardsService.getBoards
 	});
-	const { data: stages } = useQuery({
+	const { data: stages, isLoading: isLoadingStages, isError: isErrorStages } = useQuery({
 		queryKey: ["stages", selectedBoardId],
 		queryFn: () => stagesService.getStagesByBoardId(selectedBoardId),
 		enabled: !!selectedBoardId
 	});
-	const { data: fetchedSchema, isLoading: isLoadingSchema } = useQuery({
+	const { data: fetchedSchema, isLoading: isLoadingSchema, isError: isErrorSchema } = useQuery({
 		queryKey: ["stage-schema", selectedStageId],
 		queryFn: () => stageFormSchemasService.getSchemaByStageId(selectedStageId),
 		enabled: !!selectedStageId
+	});
+	const saveSchemaMutation = useMutation({
+		mutationFn: async (data) => {
+			await stageFormSchemasService.saveSchema(data.stageId, data.schema);
+		},
+		onSuccess: () => {
+			toast.success("Configuração salva com sucesso!");
+			queryClient$1.invalidateQueries({ queryKey: ["stage-schema", selectedStageId] });
+		},
+		onError: (error) => {
+			console.error(error);
+			toast.error("Erro ao salvar configuração.");
+		}
 	});
 	(0, import_react.useEffect)(() => {
 		if (fetchedSchema) setSchema(fetchedSchema);
 		else setSchema({ fields: [] });
 	}, [fetchedSchema, selectedStageId]);
+	const handleBoardChange = (boardId) => {
+		setSelectedBoardId(boardId);
+		setSelectedStageId("");
+		setSchema({ fields: [] });
+	};
 	const handleAddField = () => {
 		setEditingField(null);
 		setIsEditorOpen(true);
@@ -39960,18 +40130,12 @@ function StageFieldsConfig() {
 			fields: prev.fields.filter((f) => f.key !== key)
 		}));
 	};
-	const handleSaveSchema = async () => {
+	const handleSaveSchema = () => {
 		if (!selectedStageId) return;
-		setIsSaving(true);
-		try {
-			await stageFormSchemasService.saveSchema(selectedStageId, schema);
-			toast.success("Configuração salva com sucesso!");
-		} catch (error) {
-			console.error(error);
-			toast.error("Erro ao salvar configuração.");
-		} finally {
-			setIsSaving(false);
-		}
+		saveSchemaMutation.mutate({
+			stageId: selectedStageId,
+			schema
+		});
 	};
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 		className: "flex flex-col h-full bg-background p-6 space-y-6",
@@ -40002,8 +40166,8 @@ function StageFieldsConfig() {
 					className: "flex items-center gap-2",
 					children: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Button, {
 						onClick: handleSaveSchema,
-						disabled: !selectedStageId || isSaving,
-						children: [isSaving ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LoaderCircle, { className: "mr-2 h-4 w-4 animate-spin" }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Save, { className: "mr-2 h-4 w-4" }), "Salvar Alterações"]
+						disabled: !selectedStageId || saveSchemaMutation.isPending,
+						children: [saveSchemaMutation.isPending ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LoaderCircle, { className: "mr-2 h-4 w-4 animate-spin" }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(Save, { className: "mr-2 h-4 w-4" }), "Salvar Alterações"]
 					})
 				})]
 			}),
@@ -40016,31 +40180,45 @@ function StageFieldsConfig() {
 						children: "Seleção"
 					}), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CardDescription, { children: "Escolha o quadro e a etapa" })] }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(CardContent, {
 						className: "space-y-4",
-						children: [/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-							className: "space-y-2",
-							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label, { children: "Quadro (Board)" }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Select, {
-								value: selectedBoardId,
-								onValueChange: (val) => {
-									setSelectedBoardId(val);
-									setSelectedStageId("");
-								},
-								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(SelectTrigger, { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SelectValue, { placeholder: "Selecione um quadro" }) }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SelectContent, { children: boards?.map((board) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SelectItem, {
-									value: board.id,
-									children: board.name
-								}, board.id)) })]
-							})]
-						}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
-							className: "space-y-2",
-							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label, { children: "Etapa (Stage)" }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Select, {
-								value: selectedStageId,
-								onValueChange: setSelectedStageId,
-								disabled: !selectedBoardId,
-								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(SelectTrigger, { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SelectValue, { placeholder: !selectedBoardId ? "Selecione um quadro primeiro" : "Selecione uma etapa" }) }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SelectContent, { children: stages?.map((stage) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SelectItem, {
-									value: stage.id,
-									children: stage.name
-								}, stage.id)) })]
-							})]
-						})]
+						children: [
+							isErrorBoards && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Alert, {
+								variant: "destructive",
+								className: "mb-4",
+								children: [
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)(CircleAlert, { className: "h-4 w-4" }),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)(AlertTitle, { children: "Erro" }),
+									/* @__PURE__ */ (0, import_jsx_runtime.jsx)(AlertDescription, { children: "Falha ao carregar quadros." })
+								]
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								className: "space-y-2",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label, { children: "Quadro (Board)" }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Select, {
+									value: selectedBoardId,
+									onValueChange: handleBoardChange,
+									disabled: isLoadingBoards,
+									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(SelectTrigger, { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SelectValue, { placeholder: isLoadingBoards ? "Carregando..." : "Selecione um quadro" }) }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SelectContent, { children: boards?.map((board) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SelectItem, {
+										value: board.id,
+										children: board.name
+									}, board.id)) })]
+								})]
+							}),
+							/* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								className: "space-y-2",
+								children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(Label, { children: "Etapa (Stage)" }), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Select, {
+									value: selectedStageId,
+									onValueChange: setSelectedStageId,
+									disabled: !selectedBoardId || isLoadingStages,
+									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(SelectTrigger, { children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SelectValue, { placeholder: !selectedBoardId ? "Selecione um quadro primeiro" : isLoadingStages ? "Carregando etapas..." : "Selecione uma etapa" }) }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SelectContent, { children: stages?.map((stage) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SelectItem, {
+										value: stage.id,
+										children: stage.name
+									}, stage.id)) })]
+								})]
+							}),
+							isErrorStages && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+								className: "text-xs text-destructive mt-1",
+								children: "Erro ao carregar etapas."
+							})
+						]
 					})]
 				}), /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(Card, {
 					className: "md:col-span-3 h-full flex flex-col",
@@ -40059,14 +40237,20 @@ function StageFieldsConfig() {
 						children: !selectedStageId ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 							className: "h-full flex flex-col items-center justify-center text-muted-foreground bg-muted/10",
 							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(SquarePen, { className: "h-12 w-12 mb-4 opacity-20" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: "Selecione um quadro e uma etapa para configurar os campos." })]
+						}) : isLoadingSchema ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+							className: "h-full flex flex-col items-center justify-center",
+							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(LoaderCircle, { className: "h-8 w-8 animate-spin text-primary" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
+								className: "mt-2 text-sm text-muted-foreground",
+								children: "Carregando configuração..."
+							})]
+						}) : isErrorSchema ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+							className: "h-full flex flex-col items-center justify-center text-destructive",
+							children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)(CircleAlert, { className: "h-8 w-8 mb-2" }), /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { children: "Erro ao carregar a configuração da etapa." })]
 						}) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ScrollArea, {
 							className: "h-full",
 							children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
 								className: "p-6 space-y-3",
-								children: isLoadingSchema ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", {
-									className: "flex items-center justify-center py-10",
-									children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LoaderCircle, { className: "h-8 w-8 animate-spin text-muted-foreground" })
-								}) : schema.fields.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
+								children: schema.fields.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", {
 									className: "text-center py-10 border-2 border-dashed rounded-lg",
 									children: [/* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", {
 										className: "text-muted-foreground",
@@ -40104,7 +40288,7 @@ function StageFieldsConfig() {
 												/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: "•" }),
 												/* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", {
 													className: "capitalize",
-													children: field.type === "textarea" ? "Texto Longo" : field.type === "file" ? "Arquivo" : field.type
+													children: field.type === "textarea" ? "Texto Longo" : field.type === "file" ? "Arquivo" : field.type === "select" ? "Seleção" : field.type === "number" ? "Numérico" : field.type === "date" ? "Data" : field.type
 												})
 											]
 										})] })]
@@ -41098,4 +41282,4 @@ var App = () => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(QueryProvider, { chi
 var App_default = App;
 (0, import_client.createRoot)(document.getElementById("root")).render(/* @__PURE__ */ (0, import_jsx_runtime.jsx)(App_default, {}));
 
-//# sourceMappingURL=index-DL08IRB0.js.map
+//# sourceMappingURL=index-DLoeLO7K.js.map

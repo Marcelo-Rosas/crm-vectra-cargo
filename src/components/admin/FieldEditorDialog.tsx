@@ -71,17 +71,26 @@ export function FieldEditorDialog({
     }
   }, [field, open])
 
+  const formatKey = (value: string) => {
+    return value
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]/g, '_')
+  }
+
   const handleLabelChange = (value: string) => {
     const updates: Partial<SchemaField> = { label: value }
-    // Auto-generate key if creating new field
+    // Auto-generate key if creating new field and key hasn't been manually edited yet
+    // Or simpler: always auto-suggest if key is empty
     if (!field && !formData.key) {
-      updates.key = value
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^a-z0-9]/g, '_')
+      updates.key = formatKey(value)
     }
     setFormData((prev) => ({ ...prev, ...updates }))
+  }
+
+  const handleKeyChange = (value: string) => {
+    setFormData((prev) => ({ ...prev, key: formatKey(value) }))
   }
 
   const handleSave = () => {
@@ -120,15 +129,14 @@ export function FieldEditorDialog({
             <Input
               id="key"
               value={formData.key}
-              onChange={(e) =>
-                setFormData({ ...formData, key: e.target.value })
-              }
+              onChange={(e) => handleKeyChange(e.target.value)}
               placeholder="contract_number"
               className="font-mono text-sm"
               disabled={!!field} // Disable key editing for existing fields to prevent data loss
             />
             <p className="text-[10px] text-muted-foreground">
-              Identificador único usado no banco de dados.
+              Identificador único usado no banco de dados. Apenas letras
+              minúsculas, números e sublinhados.
             </p>
           </div>
 

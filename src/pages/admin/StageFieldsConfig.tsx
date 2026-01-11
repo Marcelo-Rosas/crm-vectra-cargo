@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import {
   Select,
@@ -18,7 +18,15 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
-import { Plus, Trash2, Edit, Save, ArrowLeft, Loader2 } from 'lucide-react'
+import {
+  Plus,
+  Trash2,
+  Edit,
+  Save,
+  ArrowLeft,
+  Loader2,
+  AlertCircle,
+} from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { boardsService } from '@/services/boards'
 import { stagesService } from '@/services/stages'
@@ -26,6 +34,7 @@ import { stageFormSchemasService } from '@/services/stage-form-schemas'
 import { StageFormSchema, SchemaField } from '@/types/crm'
 import { FieldEditorDialog } from '@/components/admin/FieldEditorDialog'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 
 export default function StageFieldsConfig() {
   const [selectedBoardId, setSelectedBoardId] = useState<string>('')
@@ -33,24 +42,54 @@ export default function StageFieldsConfig() {
   const [schema, setSchema] = useState<StageFormSchema>({ fields: [] })
   const [isEditorOpen, setIsEditorOpen] = useState(false)
   const [editingField, setEditingField] = useState<SchemaField | null>(null)
-  const [isSaving, setIsSaving] = useState(false)
+
+  const queryClient = useQueryClient()
 
   // Queries
-  const { data: boards } = useQuery({
+  const {
+    data: boards,
+    isLoading: isLoadingBoards,
+    isError: isErrorBoards,
+  } = useQuery({
     queryKey: ['boards'],
     queryFn: boardsService.getBoards,
   })
 
-  const { data: stages } = useQuery({
+  const {
+    data: stages,
+    isLoading: isLoadingStages,
+    isError: isErrorStages,
+  } = useQuery({
     queryKey: ['stages', selectedBoardId],
     queryFn: () => stagesService.getStagesByBoardId(selectedBoardId),
     enabled: !!selectedBoardId,
   })
 
-  const { data: fetchedSchema, isLoading: isLoadingSchema } = useQuery({
+  const {
+    data: fetchedSchema,
+    isLoading: isLoadingSchema,
+    isError: isErrorSchema,
+  } = useQuery({
     queryKey: ['stage-schema', selectedStageId],
     queryFn: () => stageFormSchemasService.getSchemaByStageId(selectedStageId),
     enabled: !!selectedStageId,
+  })
+
+  // Mutation
+  const saveSchemaMutation = useMutation({
+    mutationFn: async (data: { stageId: string; schema: StageFormSchema }) => {
+      await stageFormSchemasService.saveSchema(data.stageId, data.schema)
+    },
+    onSuccess: () => {
+      toast.success('Configuração salva com sucesso!')
+      queryClient.invalidateQueries({
+        queryKey: ['stage-schema', selectedStageId],
+      })
+    },
+    onError: (error) => {
+      console.error(error)
+      toast.error('Erro ao salvar configuração.')
+    },
   })
 
   // Effects
@@ -61,6 +100,12 @@ export default function StageFieldsConfig() {
       setSchema({ fields: [] })
     }
   }, [fetchedSchema, selectedStageId])
+
+  const handleBoardChange = (boardId: string) => {
+    setSelectedBoardId(boardId)
+    setSelectedStageId('')
+    setSchema({ fields: [] })
+  }
 
   const handleAddField = () => {
     setEditingField(null)
@@ -74,8 +119,6 @@ export default function StageFieldsConfig() {
 
   const handleSaveField = (field: SchemaField) => {
     setSchema((prev) => {
-      // Find if we are editing an existing field by matching the key from the editingField state
-      // (which holds the original key before any potential changes, though we disabled key editing)
       const isEditing = editingField !== null
 
       if (isEditing) {
@@ -103,18 +146,9 @@ export default function StageFieldsConfig() {
     }))
   }
 
-  const handleSaveSchema = async () => {
+  const handleSaveSchema = () => {
     if (!selectedStageId) return
-    setIsSaving(true)
-    try {
-      await stageFormSchemasService.saveSchema(selectedStageId, schema)
-      toast.success('Configuração salva com sucesso!')
-    } catch (error) {
-      console.error(error)
-      toast.error('Erro ao salvar configuração.')
-    } finally {
-      setIsSaving(false)
-    }
+    saveSchemaMutation.mutate({ stageId: selectedStageId, schema })
   }
 
   return (
@@ -139,9 +173,9 @@ export default function StageFieldsConfig() {
         <div className="flex items-center gap-2">
           <Button
             onClick={handleSaveSchema}
-            disabled={!selectedStageId || isSaving}
+            disabled={!selectedStageId || saveSchemaMutation.isPending}
           >
-            {isSaving ? (
+            {saveSchemaMutation.isPending ? (
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
             ) : (
               <Save className="mr-2 h-4 w-4" />
@@ -159,17 +193,27 @@ export default function StageFieldsConfig() {
             <CardDescription>Escolha o quadro e a etapa</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {isErrorBoards && (
+              <Alert variant="destructive" className="mb-4">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Erro</AlertTitle>
+                <AlertDescription>Falha ao carregar quadros.</AlertDescription>
+              </Alert>
+            )}
+
             <div className="space-y-2">
               <Label>Quadro (Board)</Label>
               <Select
                 value={selectedBoardId}
-                onValueChange={(val) => {
-                  setSelectedBoardId(val)
-                  setSelectedStageId('')
-                }}
+                onValueChange={handleBoardChange}
+                disabled={isLoadingBoards}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione um quadro" />
+                  <SelectValue
+                    placeholder={
+                      isLoadingBoards ? 'Carregando...' : 'Selecione um quadro'
+                    }
+                  />
                 </SelectTrigger>
                 <SelectContent>
                   {boards?.map((board) => (
@@ -186,14 +230,16 @@ export default function StageFieldsConfig() {
               <Select
                 value={selectedStageId}
                 onValueChange={setSelectedStageId}
-                disabled={!selectedBoardId}
+                disabled={!selectedBoardId || isLoadingStages}
               >
                 <SelectTrigger>
                   <SelectValue
                     placeholder={
                       !selectedBoardId
                         ? 'Selecione um quadro primeiro'
-                        : 'Selecione uma etapa'
+                        : isLoadingStages
+                          ? 'Carregando etapas...'
+                          : 'Selecione uma etapa'
                     }
                   />
                 </SelectTrigger>
@@ -206,6 +252,12 @@ export default function StageFieldsConfig() {
                 </SelectContent>
               </Select>
             </div>
+
+            {isErrorStages && (
+              <p className="text-xs text-destructive mt-1">
+                Erro ao carregar etapas.
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -235,14 +287,22 @@ export default function StageFieldsConfig() {
                   Selecione um quadro e uma etapa para configurar os campos.
                 </p>
               </div>
+            ) : isLoadingSchema ? (
+              <div className="h-full flex flex-col items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Carregando configuração...
+                </p>
+              </div>
+            ) : isErrorSchema ? (
+              <div className="h-full flex flex-col items-center justify-center text-destructive">
+                <AlertCircle className="h-8 w-8 mb-2" />
+                <p>Erro ao carregar a configuração da etapa.</p>
+              </div>
             ) : (
               <ScrollArea className="h-full">
                 <div className="p-6 space-y-3">
-                  {isLoadingSchema ? (
-                    <div className="flex items-center justify-center py-10">
-                      <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                    </div>
-                  ) : schema.fields.length === 0 ? (
+                  {schema.fields.length === 0 ? (
                     <div className="text-center py-10 border-2 border-dashed rounded-lg">
                       <p className="text-muted-foreground">
                         Nenhum campo configurado para esta etapa.
@@ -286,7 +346,13 @@ export default function StageFieldsConfig() {
                                   ? 'Texto Longo'
                                   : field.type === 'file'
                                     ? 'Arquivo'
-                                    : field.type}
+                                    : field.type === 'select'
+                                      ? 'Seleção'
+                                      : field.type === 'number'
+                                        ? 'Numérico'
+                                        : field.type === 'date'
+                                          ? 'Data'
+                                          : field.type}
                               </span>
                             </div>
                           </div>

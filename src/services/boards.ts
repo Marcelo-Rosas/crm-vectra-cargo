@@ -5,6 +5,7 @@ export const boardsService = {
     const { data, error } = await supabase
       .from('boards')
       .select('id, name')
+      .is('deleted_at', null)
       .order('name')
 
     if (error) throw error
