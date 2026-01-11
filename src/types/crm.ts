@@ -72,6 +72,7 @@ export type FieldType =
   | 'checkbox'
   | 'textarea'
   | 'select'
+  | 'file'
 
 export interface SchemaField {
   key: string

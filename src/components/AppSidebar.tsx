@@ -22,10 +22,12 @@ import {
   Briefcase,
   LogOut,
   ChevronRight,
+  Database,
 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useCRM } from '@/context/CRMContext'
 import { cn } from '@/lib/utils'
+import { Link } from 'react-router-dom'
 
 export function AppSidebar() {
   const { currentBoard, setCurrentBoard } = useCRM()
@@ -72,6 +74,22 @@ export function AppSidebar() {
                   {currentBoard === 'operation' && (
                     <ChevronRight className="ml-auto size-4" />
                   )}
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        <SidebarGroup>
+          <SidebarGroupLabel>Administração</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="Campos Personalizados">
+                  <Link to="/admin/fields">
+                    <Database className="size-4" />
+                    <span>Campos Personalizados</span>
+                  </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>

@@ -23,4 +23,33 @@ export const stageFormSchemasService = {
     // Cast the JSONB to our StageFormSchema type
     return data.schema as unknown as StageFormSchema
   },
+
+  saveSchema: async (stageId: string, schema: StageFormSchema) => {
+    // 1. Get current user
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) throw new Error('Not authenticated')
+
+    // 2. Get user's organization
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('organization_id')
+      .eq('id', user.id)
+      .single()
+
+    if (!profile?.organization_id) throw new Error('No organization found')
+
+    // 3. Upsert schema
+    const { error } = await supabase.from('stage_form_schemas').upsert(
+      {
+        stage_id: stageId,
+        organization_id: profile.organization_id,
+        schema: schema as any,
+      },
+      { onConflict: 'stage_id' },
+    )
+
+    if (error) throw error
+  },
 }

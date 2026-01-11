@@ -6,6 +6,7 @@ import { CRMProvider } from '@/context/CRMContext'
 import { QueryProvider } from '@/components/QueryProvider'
 import Index from './pages/Index'
 import NotFound from './pages/NotFound'
+import StageFieldsConfig from './pages/admin/StageFieldsConfig'
 import Layout from './components/Layout'
 
 const App = () => (
@@ -20,6 +21,7 @@ const App = () => (
           <Routes>
             <Route element={<Layout />}>
               <Route path="/" element={<Index />} />
+              <Route path="/admin/fields" element={<StageFieldsConfig />} />
             </Route>
             <Route path="*" element={<NotFound />} />
           </Routes>
